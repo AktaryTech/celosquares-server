@@ -1,35 +1,12 @@
-// const Kit = require('@celo/contractkit')
+const Kit = require('@celo/contractkit')
 // const CeloContract = Kit.CeloContract
-// const kit = Kit.newKit('http://localhost:8545')
+const kit = Kit.newKit('https://alfajores-forno.celo-testnet.org');
 var express = require('express');
 const fs = require('fs');
 const parse = require('csv-parse/lib/sync')
 var teams = require('./teams.json');
-
-// async function wrapper(){
-
-//     let accounts = await kit.web3.eth.getAccounts()
-//     let balance = await kit.getTotalBalance(accounts[0])
-
-//     const goldTokenAddress = await kit.registry.addressFor(CeloContract.GoldToken)
-//     const stableTokenAddress = await kit.registry.addressFor(CeloContract.StableToken)
-//     const registryAddress = await kit.registry.addressFor(CeloContract.Registry)
-//     const validatorsAddress = await kit.registry.addressFor(CeloContract.Validators)
-
-//     console.log("Accounts: ", accounts)
-
-//     for (let [key, value] of Object.entries(balance)) {
-//         console.log(`${key}: ${value.toString(10)}`);
-//     }
-
-//     console.log("Gold Token Address: ", goldTokenAddress)
-//     console.log("Stable Token Address: ", stableTokenAddress)
-//     console.log("Registry Address: ", registryAddress)    
-//     console.log("Validators Address: ", validatorsAddress)
-// }
-
-
-// wrapper();
+const scoracleABI = require('./ABI/scoracle.json');
+const config = require('./config');
 
 const getGameData = () => {
     const path = `${__dirname}/TeamGame.2020.csv`;
@@ -99,14 +76,36 @@ const games = getGameData();
    res.send(games);
  });
 
-  // example: http://localhost:3000/api/games/17267?api-key=dorahacks
-  app.get('/api/games/:scoreID/:quarter', function(req, res, next){
+  // example: http://localhost:3000/api/games/17267/1?api-key=dorahacks
+  app.get('/api/games/:scoreID/:quarter', async function(req, res, next){
     var scoreId = req.params.scoreID;
     var quarter = req.params.quarter;
-    var game = games.find(game => {
-        return game.ScoreID === scoreId;
-   });
-    res.send(game);
+
+    var game = games.reduce((acc, row) => {
+        if(row.ScoreID == scoreId){
+            let cumulativeScore = 0;
+            for (i = 1; i <= quarter; i++){
+                cumulativeScore += parseInt(row[`ScoreQuarter${i}`]);
+            }
+            return {
+                ...acc,
+                team1Id: row.HomeOrAway === "HOME" ? row.TeamID : row.OpponentID,
+                team2Id: row.HomeOrAway === "HOME" ? row.OpponentID : row.TeamID,
+                team1score: row.HomeOrAway === "HOME" ? cumulativeScore : acc.team1score || null,
+                team2score: row.HomeOrAway === "AWAY" ? cumulativeScore : acc.team2score || null,
+            }
+        }
+        return acc;
+   }, {});
+
+    let instance = new kit.web3.eth.Contract(scoracleABI, config.contracts.alfajores.scoracle);
+
+    kit.addAccount("0xf2f48ee19680706196e2e339e5da3491186e0c4c5030670656b0e0164837257d")
+
+    const txObject = await instance.methods.recordScore(scoreId, quarter, game.team1Id, game.team2Id, game.team1score, game.team2score);
+    let tx = await kit.sendTransactionObject(txObject, { from: '0x5409ED021D9299bf6814279A6A1411A7e866A631' })
+    const receipt = await tx.waitReceipt();
+    res.send({game, receipt});
   });
  
  // example: http://localhost:3000/api/teams/?api-key=dorahacks
