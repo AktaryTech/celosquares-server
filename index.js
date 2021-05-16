@@ -71,7 +71,7 @@ const games = getGameData();
  // we now can assume the api key is valid,
  // and simply expose the data
  
- // example: http://localhost:3000/api/games/?api-key=dorahacks
+ // example: http://localhost:5000/api/games/?api-key=dorahacks
  app.get('/api/games', function(req, res, next){
    res.send(games);
  });
@@ -108,12 +108,12 @@ const games = getGameData();
     res.send({game, receipt});
   });
  
- // example: http://localhost:3000/api/teams/?api-key=dorahacks
+ // example: http://localhost:5000/api/teams/?api-key=dorahacks
  app.get('/api/teams', function(req, res, next){
    res.send(teams);
  });
  
- // example: http://localhost:3000/api/teams/ATL?api-key=dorahacks
+ // example: http://localhost:5000/api/teams/ATL?api-key=dorahacks
  app.get('/api/teams/:name', function(req, res, next){
    var name = req.params.name;
    var team = teams.find(team => {
@@ -146,6 +146,6 @@ const games = getGameData();
  
  /* istanbul ignore next */
  if (!module.parent) {
-   app.listen(3000);
-   console.log('Express started on port 3000');
+   app.listen(5000);
+   console.log('Express started on port 5000');
  }
